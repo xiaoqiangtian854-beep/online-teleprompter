@@ -1,0 +1,904 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="在线提词器，支持字体大小、滚动速度、文档导入、进度拖动和全屏提词。">
+    <meta name="theme-color" content="#111111">
+    <title>在线提词器</title>
+    <style>
+:root {
+  color-scheme: dark;
+  --bg: #111111;
+  --panel: #1b1b1b;
+  --panel-soft: #242424;
+  --text: #f6f2e8;
+  --muted: #b9b3a8;
+  --accent: #f5c84c;
+  --accent-strong: #ffd966;
+  --border: #333333;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 100vh;
+}
+
+.toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(320px, 1.4fr) auto;
+  gap: 18px;
+  align-items: center;
+  padding: 18px 22px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.brand h1 {
+  margin: 0 0 6px;
+  font-size: 24px;
+}
+
+.brand p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.control-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.control,
+.toggle-control {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.control span,
+.toggle-control span,
+.script-panel span {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.control strong {
+  color: var(--accent-strong);
+  font-size: 14px;
+}
+
+.progress-control {
+  min-width: 160px;
+}
+
+input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.toggle-control {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  padding-top: 20px;
+  white-space: nowrap;
+}
+
+.toggle-control input {
+  accent-color: var(--accent);
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+button {
+  min-height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 16px;
+  color: var(--text);
+  background: var(--panel-soft);
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--accent);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+#playPause {
+  background: var(--accent);
+  color: #17140a;
+  border-color: var(--accent);
+  font-weight: 700;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(280px, 36%) 1fr;
+  min-height: 0;
+}
+
+.script-panel {
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  gap: 10px;
+  padding: 18px;
+  background: #151515;
+  border-right: 1px solid var(--border);
+  min-height: 0;
+}
+
+.import-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.file-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 14px;
+  background: var(--panel-soft);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.file-button:hover {
+  border-color: var(--accent);
+}
+
+.file-button input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.import-status {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.import-status.error {
+  color: #ff9b8a;
+}
+
+.import-status.success {
+  color: var(--accent-strong);
+}
+
+textarea {
+  width: 100%;
+  min-height: 0;
+  resize: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  background: #0f0f0f;
+  color: var(--text);
+  line-height: 1.7;
+  outline: none;
+}
+
+textarea:focus {
+  border-color: var(--accent);
+}
+
+.stage {
+  position: relative;
+  overflow: hidden;
+  background: #050505;
+  min-height: 0;
+}
+
+.prompt-text {
+  position: absolute;
+  top: 34vh;
+  left: 8%;
+  right: 8%;
+  white-space: pre-wrap;
+  line-height: 1.65;
+  font-size: 48px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-align: center;
+  color: #fff8df;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.72);
+  will-change: transform;
+}
+
+.stage.mirrored .prompt-text {
+  transform: scaleX(-1);
+}
+
+.stage:fullscreen {
+  background: #000000;
+}
+
+.stage:fullscreen .prompt-text {
+  left: 10%;
+  right: 10%;
+}
+
+@media (max-width: 920px) {
+  .toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .actions {
+    justify-content: flex-start;
+  }
+
+  .workspace {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(220px, 34vh) 1fr;
+  }
+
+  .script-panel {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+}
+
+@media (max-width: 620px) {
+  .control-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .toggle-control {
+    padding-top: 0;
+  }
+
+  .prompt-text {
+    left: 6%;
+    right: 6%;
+  }
+}
+
+    </style>
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="toolbar" aria-label="提词器控制">
+        <div class="brand">
+          <h1>在线提词器</h1>
+          <p>打开网址即可使用，也支持复制文件夹离线打开</p>
+        </div>
+
+        <div class="control-grid">
+          <label class="control">
+            <span>字体大小</span>
+            <input id="fontSize" type="range" min="24" max="96" step="2">
+            <strong id="fontSizeValue">48</strong>
+          </label>
+
+          <label class="control">
+            <span>滚动速度</span>
+            <input id="scrollSpeed" type="range" min="10" max="100" step="1">
+            <strong id="scrollSpeedValue">35</strong>
+          </label>
+
+          <label class="toggle-control">
+            <input id="mirrorMode" type="checkbox">
+            <span>镜像模式</span>
+          </label>
+
+          <label class="control progress-control">
+            <span>整体进度</span>
+            <input id="progressSlider" type="range" min="0" max="100" step="1">
+            <strong id="progressValue">0%</strong>
+          </label>
+        </div>
+
+        <div class="actions">
+          <button id="playPause" type="button">开始</button>
+          <button id="resetScroll" type="button">回到开头</button>
+          <button id="undoPosition" type="button" disabled>回到上一步</button>
+          <button id="fullscreen" type="button">全屏提词</button>
+        </div>
+      </section>
+
+      <section class="workspace">
+        <label class="script-panel">
+          <span>台词内容</span>
+          <div class="import-row">
+            <label class="file-button">
+              导入文档
+              <input id="fileInput" type="file" accept=".txt,.md,.markdown,.docx,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+            </label>
+            <span id="importStatus" class="import-status">支持 txt、md、docx</span>
+          </div>
+          <textarea id="scriptInput" spellcheck="false">欢迎使用本地提词器。
+
+把要拍摄的台词粘贴到这里。
+
+调节字体大小和滚动速度后，点击“开始”即可自动滚动。
+
+换电脑使用时，只需要复制整个文件夹，然后打开 index.html。</textarea>
+        </label>
+
+        <section id="stage" class="stage" aria-label="提词显示区">
+          <div id="promptText" class="prompt-text"></div>
+        </section>
+      </section>
+    </main>
+
+    <script>
+(function attachTeleprompterState(root) {
+  const MIN_FONT_SIZE = 24;
+  const MAX_FONT_SIZE = 96;
+  const MIN_SCROLL_SPEED = 10;
+  const MAX_SCROLL_SPEED = 100;
+  const MIN_PROGRESS_PERCENT = 0;
+  const MAX_PROGRESS_PERCENT = 100;
+
+  function clampNumber(value, min, max) {
+    const number = Number(value);
+    if (Number.isNaN(number)) {
+      return min;
+    }
+    return Math.min(Math.max(number, min), max);
+  }
+
+  function clampFontSize(value) {
+    return clampNumber(value, MIN_FONT_SIZE, MAX_FONT_SIZE);
+  }
+
+  function clampScrollSpeed(value) {
+    return clampNumber(value, MIN_SCROLL_SPEED, MAX_SCROLL_SPEED);
+  }
+
+  function clampProgressPercent(value) {
+    return clampNumber(value, MIN_PROGRESS_PERCENT, MAX_PROGRESS_PERCENT);
+  }
+
+  function offsetToProgressPercent(offset, maxOffset) {
+    const safeMaxOffset = Math.max(Number(maxOffset) || 0, 0);
+    if (safeMaxOffset === 0) {
+      return 0;
+    }
+    return clampProgressPercent(Math.round(((Number(offset) || 0) / safeMaxOffset) * 100));
+  }
+
+  function progressPercentToOffset(percent, maxOffset) {
+    const safeMaxOffset = Math.max(Number(maxOffset) || 0, 0);
+    return Math.round((clampProgressPercent(percent) / 100) * safeMaxOffset);
+  }
+
+  function createTeleprompterState(overrides) {
+    const options = overrides || {};
+    return {
+      fontSize: clampFontSize(options.fontSize || 48),
+      scrollSpeed: clampScrollSpeed(options.scrollSpeed || 35),
+      isPlaying: Boolean(options.isPlaying),
+      isMirrored: Boolean(options.isMirrored),
+    };
+  }
+
+  function togglePlaying(state) {
+    return {
+      ...state,
+      isPlaying: !state.isPlaying,
+    };
+  }
+
+  const api = {
+    clampFontSize,
+    clampProgressPercent,
+    clampScrollSpeed,
+    createTeleprompterState,
+    offsetToProgressPercent,
+    progressPercentToOffset,
+    togglePlaying,
+  };
+
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = api;
+  }
+
+  root.TeleprompterState = api;
+})(typeof globalThis !== "undefined" ? globalThis : window);
+
+(function attachDocumentImporter(root) {
+  const textDecoder = new TextDecoder("utf-8");
+
+  async function importPromptFile(file) {
+    const extension = getExtension(file.name);
+
+    if (extension === "txt") {
+      return extractTextFromPlainFile(file);
+    }
+
+    if (extension === "md" || extension === "markdown") {
+      return cleanMarkdownText(await file.text());
+    }
+
+    if (extension === "docx") {
+      return extractDocxText(await file.arrayBuffer(), inflateRawInBrowser);
+    }
+
+    throw new Error("暂不支持这个文件格式，请选择 txt、md 或 docx 文件。");
+  }
+
+  async function extractTextFromPlainFile(file) {
+    return formatPromptText(await file.text());
+  }
+
+  function cleanMarkdownText(markdown) {
+    return formatPromptText(
+      markdown
+        .replace(/```[\s\S]*?```/g, "")
+        .replace(/`([^`]+)`/g, "$1")
+        .replace(/^#{1,6}\s+/gm, "")
+        .replace(/^[ \t]*[-*+][ \t]+/gm, "")
+        .replace(/^[ \t]*\d+\.[ \t]+/gm, "")
+        .replace(/^[ \t]*>[ \t]?/gm, "")
+        .replace(/\*\*([^*]+)\*\*/g, "$1")
+        .replace(/\*([^*]+)\*/g, "$1")
+        .replace(/__([^_]+)__/g, "$1")
+        .replace(/_([^_]+)_/g, "$1")
+        .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1"),
+    );
+  }
+
+  async function extractDocxText(arrayBuffer, inflateRaw) {
+    const bytes = toUint8Array(arrayBuffer);
+    const entry = findZipEntry(bytes, "word/document.xml");
+    if (!entry) {
+      throw new Error("没有在 docx 中找到正文内容。");
+    }
+
+    const xmlBytes = await readZipEntry(bytes, entry, inflateRaw);
+    return extractTextFromDocumentXml(textDecoder.decode(xmlBytes));
+  }
+
+  function extractTextFromDocumentXml(xml) {
+    const paragraphs = [];
+    const paragraphMatches = xml.match(/<w:p[\s\S]*?<\/w:p>/g) || [];
+
+    for (const paragraph of paragraphMatches) {
+      const text = paragraph
+        .replace(/<w:tab\s*\/>/g, " ")
+        .replace(/<w:br\s*\/>/g, "\n")
+        .replace(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g, (_, value) => decodeXml(value))
+        .replace(/<[^>]+>/g, "");
+
+      const cleaned = text.replace(/[ \t]+\n/g, "\n").trim();
+      if (cleaned) {
+        paragraphs.push(cleaned);
+      }
+    }
+
+    return formatPromptText(paragraphs.join("\n\n"));
+  }
+
+  function formatPromptText(text) {
+    return String(text)
+      .replace(/\r\n?/g, "\n")
+      .split("\n")
+      .map((line) => line.trim())
+      .join("\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  }
+
+  function findZipEntry(bytes, targetName) {
+    const endOffset = findEndOfCentralDirectory(bytes);
+    if (endOffset < 0) {
+      throw new Error("这个 docx 文件结构不完整，无法读取。");
+    }
+
+    const directorySize = readUint32(bytes, endOffset + 12);
+    const directoryOffset = readUint32(bytes, endOffset + 16);
+    let offset = directoryOffset;
+    const end = directoryOffset + directorySize;
+
+    while (offset < end) {
+      if (readUint32(bytes, offset) !== 0x02014b50) {
+        break;
+      }
+
+      const method = readUint16(bytes, offset + 10);
+      const compressedSize = readUint32(bytes, offset + 20);
+      const nameLength = readUint16(bytes, offset + 28);
+      const extraLength = readUint16(bytes, offset + 30);
+      const commentLength = readUint16(bytes, offset + 32);
+      const localHeaderOffset = readUint32(bytes, offset + 42);
+      const name = textDecoder.decode(bytes.slice(offset + 46, offset + 46 + nameLength));
+
+      if (name === targetName) {
+        return {
+          method,
+          compressedSize,
+          localHeaderOffset,
+        };
+      }
+
+      offset += 46 + nameLength + extraLength + commentLength;
+    }
+
+    return null;
+  }
+
+  async function readZipEntry(bytes, entry, inflateRaw) {
+    const offset = entry.localHeaderOffset;
+    if (readUint32(bytes, offset) !== 0x04034b50) {
+      throw new Error("docx 内部文件头损坏，无法读取。");
+    }
+
+    const nameLength = readUint16(bytes, offset + 26);
+    const extraLength = readUint16(bytes, offset + 28);
+    const dataStart = offset + 30 + nameLength + extraLength;
+    const compressed = bytes.slice(dataStart, dataStart + entry.compressedSize);
+
+    if (entry.method === 0) {
+      return compressed;
+    }
+
+    if (entry.method === 8) {
+      return toUint8Array(await inflateRaw(compressed));
+    }
+
+    throw new Error("这个 docx 使用了暂不支持的压缩方式。");
+  }
+
+  async function inflateRawInBrowser(bytes) {
+    if (typeof DecompressionStream === "undefined") {
+      throw new Error("当前浏览器不支持离线读取 docx，请换用新版 Chrome、Edge 或 Safari。");
+    }
+
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  }
+
+  function findEndOfCentralDirectory(bytes) {
+    const minimumOffset = Math.max(0, bytes.length - 0xffff - 22);
+    for (let offset = bytes.length - 22; offset >= minimumOffset; offset -= 1) {
+      if (readUint32(bytes, offset) === 0x06054b50) {
+        return offset;
+      }
+    }
+    return -1;
+  }
+
+  function getExtension(fileName) {
+    const parts = String(fileName).toLowerCase().split(".");
+    return parts.length > 1 ? parts.pop() : "";
+  }
+
+  function readUint16(bytes, offset) {
+    return bytes[offset] | (bytes[offset + 1] << 8);
+  }
+
+  function readUint32(bytes, offset) {
+    return (
+      (bytes[offset] |
+        (bytes[offset + 1] << 8) |
+        (bytes[offset + 2] << 16) |
+        (bytes[offset + 3] << 24)) >>>
+      0
+    );
+  }
+
+  function decodeXml(value) {
+    return value
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&apos;/g, "'")
+      .replace(/&amp;/g, "&");
+  }
+
+  function toUint8Array(value) {
+    if (value instanceof Uint8Array) {
+      return value;
+    }
+    return new Uint8Array(value);
+  }
+
+  const api = {
+    cleanMarkdownText,
+    extractDocxText,
+    extractTextFromDocumentXml,
+    extractTextFromPlainFile,
+    formatPromptText,
+    importPromptFile,
+  };
+
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = api;
+  }
+
+  root.DocumentImporter = api;
+})(typeof globalThis !== "undefined" ? globalThis : window);
+
+(function startTeleprompterApp() {
+  const storageKey = "portable-teleprompter-v1";
+  const defaultScript = document.getElementById("scriptInput").value;
+  const helpers = window.TeleprompterState;
+  const documentImporter = window.DocumentImporter;
+
+  const elements = {
+    fontSize: document.getElementById("fontSize"),
+    fontSizeValue: document.getElementById("fontSizeValue"),
+    scrollSpeed: document.getElementById("scrollSpeed"),
+    scrollSpeedValue: document.getElementById("scrollSpeedValue"),
+    progressSlider: document.getElementById("progressSlider"),
+    progressValue: document.getElementById("progressValue"),
+    mirrorMode: document.getElementById("mirrorMode"),
+    playPause: document.getElementById("playPause"),
+    resetScroll: document.getElementById("resetScroll"),
+    undoPosition: document.getElementById("undoPosition"),
+    fullscreen: document.getElementById("fullscreen"),
+    scriptInput: document.getElementById("scriptInput"),
+    fileInput: document.getElementById("fileInput"),
+    importStatus: document.getElementById("importStatus"),
+    stage: document.getElementById("stage"),
+    promptText: document.getElementById("promptText"),
+  };
+
+  let state = loadState();
+  let scrollOffset = 0;
+  let previousScrollOffset = null;
+  let lastFrameTime = null;
+  let animationFrame = null;
+
+  function loadState() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(storageKey) || "{}");
+      return {
+        ...helpers.createTeleprompterState(saved),
+        script: typeof saved.script === "string" ? saved.script : defaultScript,
+      };
+    } catch (error) {
+      return {
+        ...helpers.createTeleprompterState(),
+        script: defaultScript,
+      };
+    }
+  }
+
+  function saveState() {
+    localStorage.setItem(storageKey, JSON.stringify(state));
+  }
+
+  function render() {
+    elements.fontSize.value = state.fontSize;
+    elements.fontSizeValue.textContent = state.fontSize;
+    elements.scrollSpeed.value = state.scrollSpeed;
+    elements.scrollSpeedValue.textContent = state.scrollSpeed;
+    elements.mirrorMode.checked = state.isMirrored;
+    elements.playPause.textContent = state.isPlaying ? "暂停" : "开始";
+    elements.scriptInput.value = state.script;
+    elements.promptText.textContent = state.script || "请在左侧输入台词内容";
+    elements.promptText.style.fontSize = `${state.fontSize}px`;
+    elements.promptText.style.transform = getPromptTransform();
+    elements.stage.classList.toggle("mirrored", state.isMirrored);
+    renderProgress();
+  }
+
+  function getPromptTransform() {
+    const scrollTransform = `translateY(${-scrollOffset}px)`;
+    return state.isMirrored ? `scaleX(-1) ${scrollTransform}` : scrollTransform;
+  }
+
+  function setState(nextState) {
+    state = {
+      ...state,
+      ...nextState,
+    };
+    saveState();
+    render();
+  }
+
+  function getMaxScrollOffset() {
+    return Math.max(elements.promptText.offsetHeight + elements.stage.clientHeight, 1);
+  }
+
+  function renderProgress() {
+    const percent = helpers.offsetToProgressPercent(scrollOffset, getMaxScrollOffset());
+    elements.progressSlider.value = percent;
+    elements.progressValue.textContent = `${percent}%`;
+    elements.undoPosition.disabled = previousScrollOffset === null;
+  }
+
+  function setScrollOffset(nextOffset) {
+    scrollOffset = Math.min(Math.max(Number(nextOffset) || 0, 0), getMaxScrollOffset());
+    elements.promptText.style.transform = getPromptTransform();
+    renderProgress();
+  }
+
+  function rememberPreviousPosition() {
+    previousScrollOffset = scrollOffset;
+    renderProgress();
+  }
+
+  function startLoop() {
+    if (animationFrame) {
+      return;
+    }
+    lastFrameTime = null;
+    animationFrame = requestAnimationFrame(step);
+  }
+
+  function stopLoop() {
+    if (animationFrame) {
+      cancelAnimationFrame(animationFrame);
+      animationFrame = null;
+    }
+    lastFrameTime = null;
+  }
+
+  function step(timestamp) {
+    if (!state.isPlaying) {
+      stopLoop();
+      return;
+    }
+
+    if (lastFrameTime === null) {
+      lastFrameTime = timestamp;
+    }
+
+    const elapsedSeconds = (timestamp - lastFrameTime) / 1000;
+    lastFrameTime = timestamp;
+    scrollOffset += state.scrollSpeed * elapsedSeconds;
+    elements.promptText.style.transform = getPromptTransform();
+    renderProgress();
+
+    const endPoint = getMaxScrollOffset();
+    if (scrollOffset > endPoint) {
+      scrollOffset = 0;
+      animationFrame = null;
+      setState({ isPlaying: false });
+      render();
+      return;
+    }
+
+    animationFrame = requestAnimationFrame(step);
+  }
+
+  function togglePlayback() {
+    state = helpers.togglePlaying(state);
+    saveState();
+    render();
+    if (state.isPlaying) {
+      startLoop();
+    } else {
+      stopLoop();
+    }
+  }
+
+  elements.fontSize.addEventListener("input", (event) => {
+    setState({ fontSize: helpers.clampFontSize(event.target.value) });
+  });
+
+  elements.scrollSpeed.addEventListener("input", (event) => {
+    setState({ scrollSpeed: helpers.clampScrollSpeed(event.target.value) });
+  });
+
+  elements.mirrorMode.addEventListener("change", (event) => {
+    setState({ isMirrored: event.target.checked });
+  });
+
+  elements.scriptInput.addEventListener("input", (event) => {
+    previousScrollOffset = scrollOffset;
+    setScrollOffset(0);
+    elements.importStatus.textContent = "手动编辑中";
+    elements.importStatus.className = "import-status";
+    setState({ script: event.target.value });
+  });
+
+  elements.fileInput.addEventListener("change", async (event) => {
+    const file = event.target.files && event.target.files[0];
+    if (!file) {
+      return;
+    }
+
+    elements.importStatus.textContent = `正在读取：${file.name}`;
+    elements.importStatus.className = "import-status";
+
+    try {
+      const text = await documentImporter.importPromptFile(file);
+      previousScrollOffset = scrollOffset;
+      setScrollOffset(0);
+      stopLoop();
+      setState({ script: text, isPlaying: false });
+      elements.importStatus.textContent = `已导入：${file.name}`;
+      elements.importStatus.className = "import-status success";
+    } catch (error) {
+      elements.importStatus.textContent = error.message || "导入失败，请换一个文件试试。";
+      elements.importStatus.className = "import-status error";
+    } finally {
+      event.target.value = "";
+    }
+  });
+
+  elements.playPause.addEventListener("click", togglePlayback);
+
+  elements.resetScroll.addEventListener("click", () => {
+    rememberPreviousPosition();
+    setScrollOffset(0);
+    setState({ isPlaying: false });
+    stopLoop();
+  });
+
+  elements.progressSlider.addEventListener("pointerdown", rememberPreviousPosition);
+
+  elements.progressSlider.addEventListener("focus", () => {
+    if (previousScrollOffset === null) {
+      rememberPreviousPosition();
+    }
+  });
+
+  elements.progressSlider.addEventListener("input", (event) => {
+    const nextOffset = helpers.progressPercentToOffset(event.target.value, getMaxScrollOffset());
+    setScrollOffset(nextOffset);
+  });
+
+  elements.undoPosition.addEventListener("click", () => {
+    if (previousScrollOffset === null) {
+      return;
+    }
+    const restoreOffset = previousScrollOffset;
+    previousScrollOffset = scrollOffset;
+    setScrollOffset(restoreOffset);
+  });
+
+  elements.fullscreen.addEventListener("click", () => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+      return;
+    }
+    elements.stage.requestFullscreen();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.code === "Space" && event.target !== elements.scriptInput) {
+      event.preventDefault();
+      togglePlayback();
+    }
+  });
+
+  render();
+})();
+
+    </script>
+  </body>
+</html>
